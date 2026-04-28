@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">LivePaper</string>
+    <string name="wallpaper_description">A video live wallpaper that plays when unlocked.</string>
+    <string name="video_wallpaper_service">Video Wallpaper Service</string>
+</resources>
