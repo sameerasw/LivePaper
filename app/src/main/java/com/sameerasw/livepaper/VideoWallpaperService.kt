@@ -1,7 +1,9 @@
 package com.sameerasw.livepaper
 
-import android.os.Handler
-import android.os.Looper
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.annotation.OptIn
@@ -16,28 +18,35 @@ class VideoWallpaperService : WallpaperService() {
 
     inner class VideoEngine : Engine() {
         private var exoPlayer: ExoPlayer? = null
-        private val handler = Handler(Looper.getMainLooper())
-        private var isVisible = false
-
-        private val reverseRunnable = object : Runnable {
-            override fun run() {
-                val player = exoPlayer ?: return
-                val current = player.currentPosition
-                if (current > 0) {
-                    player.seekTo(maxOf(0, current - 33)) // Seek back ~30fps
-                    handler.postDelayed(this, 33)
+        
+        private val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_USER_PRESENT -> {
+                        // User unlocked the phone
+                        exoPlayer?.play()
+                    }
+                    Intent.ACTION_SCREEN_OFF -> {
+                        // User locked the phone (or screen timed out)
+                        exoPlayer?.pause()
+                        exoPlayer?.seekTo(0) // Snap back to the first frame
+                    }
                 }
             }
         }
 
+        override fun onCreate(surfaceHolder: SurfaceHolder?) {
+            super.onCreate(surfaceHolder)
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+            registerReceiver(receiver, filter)
+        }
+
         override fun onVisibilityChanged(visible: Boolean) {
-            this.isVisible = visible
-            if (visible) {
-                handler.removeCallbacks(reverseRunnable)
-                exoPlayer?.play()
-            } else {
+            if (!visible) {
                 exoPlayer?.pause()
-                handler.post(reverseRunnable)
             }
         }
 
@@ -61,7 +70,11 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
-            handler.removeCallbacks(reverseRunnable)
+            try {
+                unregisterReceiver(receiver)
+            } catch (e: Exception) {
+                // Ignore if not registered
+            }
             exoPlayer?.release()
             exoPlayer = null
         }
