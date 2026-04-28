@@ -22,6 +22,7 @@ class VideoWallpaperService : WallpaperService() {
     inner class VideoEngine : Engine() {
         private var exoPlayer: ExoPlayer? = null
         private lateinit var prefs: PreferencesManager
+        private val executor = android.os.Handler(android.os.Looper.getMainLooper())
         private val keyguardManager by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
 
         private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -43,8 +44,11 @@ class VideoWallpaperService : WallpaperService() {
                 when (intent?.action) {
                     Intent.ACTION_USER_PRESENT -> exoPlayer?.play()
                     Intent.ACTION_SCREEN_OFF -> {
-                        exoPlayer?.pause()
-                        exoPlayer?.seekTo(0)
+                        executor.removeCallbacksAndMessages(null)
+                        executor.postDelayed({
+                            exoPlayer?.pause()
+                            exoPlayer?.seekTo(0)
+                        }, 500)
                     }
                     Intent.ACTION_SCREEN_ON -> {
                         val shouldPlay = isPreview || 
@@ -52,10 +56,14 @@ class VideoWallpaperService : WallpaperService() {
                                        prefs.playbackTrigger == PreferencesManager.TRIGGER_SCREEN_ON
                         
                         if (shouldPlay) {
+                            executor.removeCallbacksAndMessages(null)
                             exoPlayer?.play()
                         } else {
-                            exoPlayer?.pause()
-                            exoPlayer?.seekTo(0)
+                            executor.removeCallbacksAndMessages(null)
+                            executor.postDelayed({
+                                exoPlayer?.pause()
+                                exoPlayer?.seekTo(0)
+                            }, 500)
                         }
                     }
                 }
@@ -127,6 +135,7 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
+            executor.removeCallbacksAndMessages(null)
             try { unregisterReceiver(receiver) } catch (e: Exception) { }
             applicationContext.getSharedPreferences(PreferencesManager.PREFS_NAME, Context.MODE_PRIVATE)
                 .unregisterOnSharedPreferenceChangeListener(prefsListener)
