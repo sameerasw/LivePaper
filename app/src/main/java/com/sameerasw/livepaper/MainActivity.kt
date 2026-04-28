@@ -70,6 +70,7 @@ fun VideoPickerSheet(onDismiss: () -> Unit) {
     val prefs = remember { PreferencesManager(context) }
     val availableVideos = remember { prefs.getAvailableVideos() }
     var selectedVideo by remember { mutableStateOf(prefs.selectedVideoName) }
+    var playbackTrigger by remember { mutableStateOf(prefs.playbackTrigger) }
     
     LaunchedEffect(availableVideos) {
         if (selectedVideo == PreferencesManager.DEFAULT_VIDEO && availableVideos.isNotEmpty()) {
@@ -85,6 +86,40 @@ fun VideoPickerSheet(onDismiss: () -> Unit) {
             .padding(16.dp)
             .navigationBarsPadding()
     ) {
+        Text(
+            text = "Play when",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            val options = listOf(
+                PreferencesManager.TRIGGER_UNLOCK to "Unlock",
+                PreferencesManager.TRIGGER_SCREEN_ON to "Screen on"
+            )
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = playbackTrigger == value,
+                    onClick = {
+                        playbackTrigger = value
+                        prefs.playbackTrigger = value
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                ) {
+                    Text(label)
+                }
+            }
+        }
+
+        Text(
+            text = "Video",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             contentPadding = PaddingValues(8.dp),

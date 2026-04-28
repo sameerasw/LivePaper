@@ -25,7 +25,17 @@ class VideoWallpaperService : WallpaperService() {
         private val keyguardManager by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
 
         private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == PreferencesManager.KEY_SELECTED_VIDEO) loadSelectedVideo()
+            when (key) {
+                PreferencesManager.KEY_SELECTED_VIDEO -> loadSelectedVideo()
+                PreferencesManager.KEY_PLAYBACK_TRIGGER -> {
+                    // Update current playback state if screen is on
+                    if (isVisible && !keyguardManager.isKeyguardLocked) {
+                        exoPlayer?.play()
+                    } else if (isVisible && prefs.playbackTrigger == PreferencesManager.TRIGGER_SCREEN_ON) {
+                        exoPlayer?.play()
+                    }
+                }
+            }
         }
 
         private val receiver = object : BroadcastReceiver() {
@@ -37,7 +47,11 @@ class VideoWallpaperService : WallpaperService() {
                         exoPlayer?.seekTo(0)
                     }
                     Intent.ACTION_SCREEN_ON -> {
-                        if (isPreview || !keyguardManager.isKeyguardLocked) {
+                        val shouldPlay = isPreview || 
+                                       !keyguardManager.isKeyguardLocked || 
+                                       prefs.playbackTrigger == PreferencesManager.TRIGGER_SCREEN_ON
+                        
+                        if (shouldPlay) {
                             exoPlayer?.play()
                         } else {
                             exoPlayer?.pause()
@@ -66,7 +80,10 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(visible: Boolean) {
             if (visible) {
-                if (isPreview || !keyguardManager.isKeyguardLocked) exoPlayer?.play()
+                val shouldPlay = isPreview || 
+                               !keyguardManager.isKeyguardLocked || 
+                               prefs.playbackTrigger == PreferencesManager.TRIGGER_SCREEN_ON
+                if (shouldPlay) exoPlayer?.play()
             } else {
                 exoPlayer?.pause()
             }
@@ -85,7 +102,10 @@ class VideoWallpaperService : WallpaperService() {
                 volume = 0f
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                 loadSelectedVideo()
-                playWhenReady = isPreview || !keyguardManager.isKeyguardLocked
+                val shouldPlay = isPreview || 
+                               !keyguardManager.isKeyguardLocked || 
+                               prefs.playbackTrigger == PreferencesManager.TRIGGER_SCREEN_ON
+                playWhenReady = shouldPlay
             }
         }
 
