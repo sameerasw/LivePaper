@@ -4,22 +4,21 @@ import android.content.Context
 import android.content.SharedPreferences
 
 class PreferencesManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     var selectedVideoName: String
-        get() = prefs.getString("selected_video", "my_video") ?: "my_video"
-        set(value) = prefs.edit().putString("selected_video", value).apply()
+        get() = prefs.getString(KEY_SELECTED_VIDEO, DEFAULT_VIDEO) ?: DEFAULT_VIDEO
+        set(value) = prefs.edit().putString(KEY_SELECTED_VIDEO, value).apply()
 
-    fun getAvailableVideos(context: Context): List<String> {
-        val videos = mutableListOf<String>()
-        val fields = R.raw::class.java.fields
-        for (field in fields) {
-            try {
-                videos.add(field.name)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    fun getAvailableVideos(): List<String> {
+        return R.raw::class.java.fields.mapNotNull { field ->
+            try { field.name } catch (e: Exception) { null }
         }
-        return videos
+    }
+
+    companion object {
+        const val PREFS_NAME = "wallpaper_prefs"
+        const val KEY_SELECTED_VIDEO = "selected_video"
+        const val DEFAULT_VIDEO = "my_video"
     }
 }

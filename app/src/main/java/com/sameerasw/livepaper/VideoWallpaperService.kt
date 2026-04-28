@@ -22,29 +22,22 @@ class VideoWallpaperService : WallpaperService() {
     inner class VideoEngine : Engine() {
         private var exoPlayer: ExoPlayer? = null
         private lateinit var prefs: PreferencesManager
-        
+        private val keyguardManager by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
+
         private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "selected_video") {
-                loadSelectedVideo()
-            }
+            if (key == PreferencesManager.KEY_SELECTED_VIDEO) loadSelectedVideo()
         }
-        
+
         private val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_USER_PRESENT -> {
-                        // User unlocked the phone
-                        exoPlayer?.play()
-                    }
+                    Intent.ACTION_USER_PRESENT -> exoPlayer?.play()
                     Intent.ACTION_SCREEN_OFF -> {
-                        // User locked the phone - pause and snap to first frame
                         exoPlayer?.pause()
                         exoPlayer?.seekTo(0)
                     }
                     Intent.ACTION_SCREEN_ON -> {
-                        // Screen turned on - play if unlocked or in preview
-                        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        if (isPreview || !km.isKeyguardLocked) {
+                        if (isPreview || !keyguardManager.isKeyguardLocked) {
                             exoPlayer?.play()
                         } else {
                             exoPlayer?.pause()
@@ -59,23 +52,21 @@ class VideoWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
             prefs = PreferencesManager(applicationContext)
+            
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_USER_PRESENT)
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
             }
             registerReceiver(receiver, filter)
-            
-            applicationContext.getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+
+            applicationContext.getSharedPreferences(PreferencesManager.PREFS_NAME, Context.MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(prefsListener)
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             if (visible) {
-                val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                if (isPreview || !km.isKeyguardLocked) {
-                    exoPlayer?.play()
-                }
+                if (isPreview || !keyguardManager.isKeyguardLocked) exoPlayer?.play()
             } else {
                 exoPlayer?.pause()
             }
@@ -84,49 +75,40 @@ class VideoWallpaperService : WallpaperService() {
         @OptIn(UnstableApi::class)
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            
             val renderersFactory = DefaultRenderersFactory(applicationContext)
-            
             val player = ExoPlayer.Builder(applicationContext, renderersFactory).build()
             exoPlayer = player
-            
+
             player.apply {
                 setVideoSurfaceHolder(holder)
                 repeatMode = Player.REPEAT_MODE_OFF
-                volume = 0f 
+                volume = 0f
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                
                 loadSelectedVideo()
-                
-                val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                playWhenReady = isPreview || !km.isKeyguardLocked
+                playWhenReady = isPreview || !keyguardManager.isKeyguardLocked
             }
         }
 
         @OptIn(UnstableApi::class)
         private fun loadSelectedVideo() {
             val videoName = prefs.selectedVideoName
-            val videoResId = resources.getIdentifier(videoName, "raw", packageName)
-            if (videoResId != 0) {
-                val mediaItem = MediaItem.fromUri("android.resource://$packageName/$videoResId")
+            val resId = resources.getIdentifier(videoName, "raw", packageName)
+            if (resId != 0) {
+                val mediaItem = MediaItem.fromUri("android.resource://$packageName/$resId")
                 exoPlayer?.setMediaItem(mediaItem)
                 exoPlayer?.prepare()
             }
         }
 
-        override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            super.onSurfaceChanged(holder, format, width, height)
+        override fun onSurfaceChanged(holder: SurfaceHolder, f: Int, w: Int, h: Int) {
+            super.onSurfaceChanged(holder, f, w, h)
             exoPlayer?.videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
         }
 
         override fun onDestroy() {
             super.onDestroy()
-            try {
-                unregisterReceiver(receiver)
-            } catch (e: Exception) {
-                // Ignore
-            }
-            applicationContext.getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+            try { unregisterReceiver(receiver) } catch (e: Exception) { }
+            applicationContext.getSharedPreferences(PreferencesManager.PREFS_NAME, Context.MODE_PRIVATE)
                 .unregisterOnSharedPreferenceChangeListener(prefsListener)
             exoPlayer?.release()
             exoPlayer = null

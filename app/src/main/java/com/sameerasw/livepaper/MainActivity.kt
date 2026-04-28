@@ -1,9 +1,5 @@
 package com.sameerasw.livepaper
 
-import android.app.WallpaperManager
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -35,21 +31,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sameerasw.livepaper.ui.theme.LivePaperTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             LivePaperTheme {
-                val sheetState = rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true
-                )
+                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 var showSheet by remember { mutableStateOf(true) }
-                val context = LocalContext.current
 
                 if (showSheet) {
                     ModalBottomSheet(
@@ -61,12 +53,10 @@ class MainActivity : ComponentActivity() {
                         containerColor = MaterialTheme.colorScheme.surface,
                         dragHandle = { BottomSheetDefaults.DragHandle() }
                     ) {
-                        VideoPickerSheet(
-                            onDismiss = {
-                                showSheet = false
-                                finish()
-                            }
-                        )
+                        VideoPickerSheet(onDismiss = {
+                            showSheet = false
+                            finish()
+                        })
                     }
                 }
             }
@@ -78,15 +68,14 @@ class MainActivity : ComponentActivity() {
 fun VideoPickerSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
-    val availableVideos = remember { prefs.getAvailableVideos(context) }
+    val availableVideos = remember { prefs.getAvailableVideos() }
     var selectedVideo by remember { mutableStateOf(prefs.selectedVideoName) }
     
-    // Default selection if none is selected or current selection is invalid
     LaunchedEffect(availableVideos) {
-        if (selectedVideo == "my_video" && availableVideos.isNotEmpty()) {
-            val firstVideo = availableVideos.first()
-            selectedVideo = firstVideo
-            prefs.selectedVideoName = firstVideo
+        if (selectedVideo == PreferencesManager.DEFAULT_VIDEO && availableVideos.isNotEmpty()) {
+            val first = availableVideos.first()
+            selectedVideo = first
+            prefs.selectedVideoName = first
         }
     }
 
@@ -118,9 +107,7 @@ fun VideoPickerSheet(onDismiss: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = {
-                onDismiss()
-            },
+            onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -137,17 +124,14 @@ fun ThumbnailItem(videoName: String, isSelected: Boolean, onClick: () -> Unit) {
 
     LaunchedEffect(videoName) {
         thumbnail = withContext(Dispatchers.IO) {
-            val videoResId = context.resources.getIdentifier(videoName, "raw", context.packageName)
-            if (videoResId != 0) {
-                val retriever = MediaMetadataRetriever()
-                try {
-                    val uri = Uri.parse("android.resource://${context.packageName}/$videoResId")
-                    retriever.setDataSource(context, uri)
-                    retriever.getFrameAtTime(0)
-                } catch (e: Exception) {
-                    null
-                } finally {
-                    retriever.release()
+            val resId = context.resources.getIdentifier(videoName, "raw", context.packageName)
+            if (resId != 0) {
+                MediaMetadataRetriever().use { retriever ->
+                    try {
+                        val uri = Uri.parse("android.resource://${context.packageName}/$resId")
+                        retriever.setDataSource(context, uri)
+                        retriever.getFrameAtTime(0)
+                    } catch (e: Exception) { null }
                 }
             } else null
         }
@@ -190,7 +174,7 @@ fun ThumbnailItem(videoName: String, isSelected: Boolean, onClick: () -> Unit) {
                     painter = painterResource(id = R.drawable.rounded_check_circle_24),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(24.dp) // Smaller checkmark for smaller tiles
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
