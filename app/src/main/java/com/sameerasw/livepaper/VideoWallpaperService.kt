@@ -100,6 +100,7 @@ class VideoWallpaperService : WallpaperService() {
             super.onSurfaceCreated(holder)
             
             val renderersFactory = DefaultRenderersFactory(applicationContext)
+            val prefs = PreferencesManager(applicationContext)
             
             exoPlayer = ExoPlayer.Builder(applicationContext, renderersFactory).build().apply {
                 setVideoSurfaceHolder(holder)
@@ -107,7 +108,8 @@ class VideoWallpaperService : WallpaperService() {
                 volume = 0f // Mute by default for wallpaper
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                 
-                val videoResId = resources.getIdentifier("my_video", "raw", packageName)
+                val videoName = prefs.selectedVideoName
+                val videoResId = resources.getIdentifier(videoName, "raw", packageName)
                 if (videoResId != 0) {
                     val mediaItem = MediaItem.fromUri("android.resource://$packageName/$videoResId")
                     setMediaItem(mediaItem)
