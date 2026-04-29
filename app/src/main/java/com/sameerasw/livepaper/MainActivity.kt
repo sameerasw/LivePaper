@@ -5,9 +5,13 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
+import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -67,10 +71,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun VideoPickerSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
     val prefs = remember { PreferencesManager(context) }
-    val availableVideos = remember { prefs.getAvailableVideos() }
+    var availableVideos by remember { mutableStateOf(prefs.getAvailableVideos()) }
     var selectedVideo by remember { mutableStateOf(prefs.selectedVideoName) }
     var playbackTrigger by remember { mutableStateOf(prefs.playbackTrigger) }
+
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            uri?.let {
+                try {
+                    context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: Exception) { e.printStackTrace() }
+                prefs.addCustomVideo(it.toString())
+                availableVideos = prefs.getAvailableVideos()
+                selectedVideo = it.toString()
+                prefs.selectedVideoName = it.toString()
+            }
+        }
+    )
     
     LaunchedEffect(availableVideos) {
         if (selectedVideo == PreferencesManager.DEFAULT_VIDEO && availableVideos.isNotEmpty()) {
@@ -127,6 +147,13 @@ fun VideoPickerSheet(onDismiss: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f, fill = false)
         ) {
+            item {
+                AddVideoItem(onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_PRESS)
+                    pickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                })
+            }
+
             items(availableVideos) { video ->
                 ThumbnailItem(
                     videoName = video,
@@ -168,7 +195,15 @@ fun ThumbnailItem(videoName: String, isSelected: Boolean, onClick: () -> Unit) {
                         retriever.getFrameAtTime(0)
                     } catch (e: Exception) { null }
                 }
-            } else null
+            } else {
+                try {
+                    val uri = Uri.parse(videoName)
+                    MediaMetadataRetriever().use { retriever ->
+                        retriever.setDataSource(context, uri)
+                        retriever.getFrameAtTime(0)
+                    }
+                } catch (e: Exception) { null }
+            }
         }
     }
 
@@ -215,10 +250,44 @@ fun ThumbnailItem(videoName: String, isSelected: Boolean, onClick: () -> Unit) {
         }
         
         Text(
-            text = videoName.replace("_", " ").replaceFirstChar { it.uppercase() },
+            text = if (videoName.startsWith("content://")) {
+                stringResource(R.string.custom_video)
+            } else {
+                videoName.replace("_", " ").replaceFirstChar { it.uppercase() }
+            },
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+@Composable
+fun AddVideoItem(onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .aspectRatio(9f / 16f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.rounded_add_24),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+
+        Text(
+            text = stringResource(R.string.add_video),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 4.dp)
         )
     }

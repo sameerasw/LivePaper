@@ -15,8 +15,26 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_PLAYBACK_TRIGGER, value).apply()
 
     fun getAvailableVideos(): List<String> {
-        return R.raw::class.java.fields.mapNotNull { field ->
+        val raws = R.raw::class.java.fields.mapNotNull { field ->
             try { field.name } catch (e: Exception) { null }
+        }
+        return raws + customVideos
+    }
+
+    var customVideos: List<String>
+        get() = prefs.getString(KEY_CUSTOM_VIDEOS, "")?.split(",")?.filter { it.isNotEmpty() } ?: emptyList()
+        set(value) = prefs.edit().putString(KEY_CUSTOM_VIDEOS, value.joinToString(",")).apply()
+
+    fun addCustomVideo(uri: String) {
+        val current = customVideos.toMutableList()
+        if (current.contains(uri)) {
+            current.remove(uri)
+        }
+        current.add(0, uri)
+        if (current.size > 5) {
+            customVideos = current.take(5)
+        } else {
+            customVideos = current
         }
     }
 
@@ -24,6 +42,7 @@ class PreferencesManager(context: Context) {
         const val PREFS_NAME = "wallpaper_prefs"
         const val KEY_SELECTED_VIDEO = "selected_video"
         const val KEY_PLAYBACK_TRIGGER = "playback_trigger"
+        const val KEY_CUSTOM_VIDEOS = "custom_videos"
         const val DEFAULT_VIDEO = "my_video"
         const val TRIGGER_UNLOCK = "unlock"
         const val TRIGGER_SCREEN_ON = "screen_on"

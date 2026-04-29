@@ -1,6 +1,7 @@
 package com.sameerasw.livepaper
 
 import android.app.KeyguardManager
+import android.net.Uri
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -121,9 +122,18 @@ class VideoWallpaperService : WallpaperService() {
         private fun loadSelectedVideo() {
             val videoName = prefs.selectedVideoName
             val resId = resources.getIdentifier(videoName, "raw", packageName)
-            if (resId != 0) {
-                val mediaItem = MediaItem.fromUri("android.resource://$packageName/$resId")
-                exoPlayer?.setMediaItem(mediaItem)
+            val mediaItem = if (resId != 0) {
+                MediaItem.fromUri("android.resource://$packageName/$resId")
+            } else {
+                try {
+                    MediaItem.fromUri(Uri.parse(videoName))
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            mediaItem?.let {
+                exoPlayer?.setMediaItem(it)
                 exoPlayer?.prepare()
             }
         }

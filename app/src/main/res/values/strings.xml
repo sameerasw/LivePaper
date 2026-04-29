@@ -6,4 +6,6 @@
     <string name="choose_video_prompt">Choose your wallpaper video:</string>
     <string name="btn_set_wallpaper">Set as Wallpaper</string>
     <string name="btn_apply">Apply</string>
+    <string name="add_video">Add video</string>
+    <string name="custom_video">Custom video</string>
 </resources>
